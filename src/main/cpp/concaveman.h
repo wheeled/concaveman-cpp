@@ -226,7 +226,7 @@ public:
         if (!best_child.get().is_leaf()) {
             best_child.get().insert(data, bounds);
 #ifdef DEBUG
-            std::cout << "best_child: " << bounds[0] << " " << bounds[1] << std::endl;
+//            std::cout << "best_child: " << bounds[0] << " " << bounds[1] << std::endl;
 #endif
             return;
         }
@@ -630,7 +630,7 @@ template<class T, int MAX_CHILDREN> std::vector<std::array<T, 2>> concaveman(
 #ifdef DEBUG_2
         // dump key parameters either on every pass or when a certain point is 'b'
         point_type trigger = { 151.1373474787800, -33.7733192376544 };
-        snapshot(a, b, c, d, sqLen, maxSqLen, trigger, true);
+        snapshot(a, b, c, d, sqLen, maxSqLen, trigger, false);
 #endif
 
         // find the best connection point for the current edge to flex inward to
@@ -744,15 +744,15 @@ template<class T, int MAX_CHILDREN> std::array<T, 2> findCandidate(
                 return std::get<1>(item).get().data();
             }
 
-#ifdef DEBUG_2
-            else {
-                bool cond1 = -std::get<0>(item) < d0;
-                bool cond2 = -std::get<0>(item) < d1;
-                bool cond3 = noIntersections(b, p, segTree);
-                bool cond4 = noIntersections(c, p, segTree);
-                std::cout << "Not OK: " << cond1 << " " << cond2 << " " << cond3 << " " << cond4 << std::endl;
-            }
-#endif
+//#ifdef DEBUG_2
+//            else {
+//                bool cond1 = -std::get<0>(item) < d0;
+//                bool cond2 = -std::get<0>(item) < d1;
+//                bool cond3 = noIntersections(b, p, segTree);
+//                bool cond4 = noIntersections(c, p, segTree);
+//                std::cout << "Not OK: " << cond1 << " " << cond2 << " " << cond3 << " " << cond4 << std::endl;
+//            }
+//#endif
          }
 
         if (queue.empty())
