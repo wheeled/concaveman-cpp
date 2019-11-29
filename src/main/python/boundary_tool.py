@@ -81,7 +81,8 @@ def apply_corrections(points, missing):
     for idx, row in enumerate(array):
         active_column = np.logical_not(np.isnan(row))
         if active_column.all() or not active_column.any():
-            print("Invalid format: each row of 'corrections.csv' must have one of hull index or missing index (%s: %s)" % (idx, row))
+            print("Invalid format: each row of 'corrections.csv' must have one of "
+                  "hull index or missing index (%s: %s)" % (idx, row))
             return points
 
         if active_column[0] and row[0] >= pointer and pointer not in array[idx + 1:, 0]:
@@ -96,7 +97,8 @@ def apply_corrections(points, missing):
             corrected_points.append(missing[int(row[1])])
 
         else:
-            print("Unexplained error processing corrections at row %s: %s" % (idx, row))
+            print("Corrections out of order at row %s: pointer (%s) has already "
+                  "passed this value %s" % (idx, pointer, row))
             return points
 
     if pointer < len(points) - 1:
@@ -121,7 +123,7 @@ def main():
         points = unique(raw_points)
         print("Opening boundary_points with CRS = %s (%s points)" % (gdf.crs['init'], len(points)))
         if gdf.crs['init'] != CRS:
-            print("GeoPackage CRS (%s) is not the same as default CRS (%s)" % (gdf.crs, CRS))
+            print("GeoPackage CRS (%s) is not the same as default CRS (%s)" % (gdf.crs['init'], CRS))
 
     elif infile_format == 'csv':
         with open(INFILE, 'r') as csvfile:
