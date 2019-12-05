@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from datetime import datetime
 from concaveman import concaveman2d
 from scipy.spatial import ConvexHull
 from shapely import geometry
@@ -12,6 +13,7 @@ CRS = "epsg:4283"
 INFILE = '/Users/wheeled/GEOSPATIAL/SDS boundaries/Prototype.gpkg'
 # INFILE = '/Users/wheeled/PycharmProjects/concaveman-cpp/src/main/python/data/boundary_prototype.csv'
 OUTFILE = '/Users/wheeled/GEOSPATIAL/SDS boundaries/Prototype.gpkg'
+LOGFILE = '/Users/wheeled/PycharmProjects/concaveman-cpp/src/main/python/data/boundary_tool_log.txt'
 CSVPATH = '/Users/wheeled/PycharmProjects/concaveman-cpp/src/main/python/data'
 CONCAVITY = 1.2
 CORRECTIONS = os.path.join(CSVPATH, 'corrections.csv')
@@ -37,8 +39,9 @@ def save_as_csv(filename, points):
 
 class GeoPackageFile(object):
     # this object will contain the intermediate geometries as a link to QGIS
-    def __init__(self, filepath):
+    def __init__(self, filepath, crs=CRS):
         self.filepath = filepath
+        self.crs = crs
 
     def add_point_layer(self, layername, indexed_list, crs=CRS):
         df = pd.DataFrame({
@@ -46,16 +49,28 @@ class GeoPackageFile(object):
             'X': [row[1] for row in indexed_list],
             'Y': [row[2] for row in indexed_list],
         })
-        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.X, df.Y), crs=crs)
+        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.X, df.Y), crs=self.crs)
         gdf.to_file(self.filepath, layer=layername, driver="GPKG")
 
     def add_boundary_polygon(self, layername, indexed_list, crs=CRS):
         polygon = geometry.Polygon([[p[1], p[2]] for p in indexed_list])
-        gdf = gpd.GeoDataFrame(pd.DataFrame({'geometry': [polygon]}), crs=crs)
+        gdf = gpd.GeoDataFrame(pd.DataFrame({'geometry': [polygon]}), crs=self.crs)
         gdf.to_file(self.filepath, layer=layername, driver="GPKG")
 
 
-def apply_corrections(points, missing):
+class LogFile(object):
+    def __init__(self, filepath):
+        self.filepath = filepath
+        with open(self.filepath, 'w+') as f:
+            f.write("Boundary tool session log %s\n" % datetime.now().strftime("%d/%m/%Y %H:%M"))
+
+    def echo(self, string):
+        print(string)
+        with open(self.filepath, 'a') as f:
+            f.write("%s\n" % string)
+
+
+def apply_corrections(points, missing, info):
     if not os.path.exists(CORRECTIONS):
         print("No corrections possible: 'corrections.csv' file missing")
         return points
@@ -75,7 +90,7 @@ def apply_corrections(points, missing):
         print("An index value in column 1 of 'corrections.csv' exceeds the number of missing points")
         return points
 
-    print('Applying corrections and inserting %s missing points' % len(missing))
+    info.echo('Applying corrections and inserting %s missing points' % len(missing))
     corrected_points = []
     pointer = 0
     for idx, row in enumerate(array):
@@ -115,15 +130,16 @@ def apply_corrections(points, missing):
 
 
 def main():
+    info = LogFile(LOGFILE)
     infile_format = INFILE.split('.')[-1].lower()
 
     if infile_format == 'gpkg':
         gdf = gpd.read_file(INFILE, driver="GPKG", layer="boundary_points")
         raw_points = [[point.x, point.y] for point in gdf.geometry]
         points = unique(raw_points)
-        print("Opening boundary_points with CRS = %s (%s points)" % (gdf.crs['init'], len(points)))
+        info.echo("Opening boundary_points with CRS = %s (%s points)" % (gdf.crs['init'], len(points)))
         if gdf.crs['init'] != CRS:
-            print("GeoPackage CRS (%s) is not the same as default CRS (%s)" % (gdf.crs['init'], CRS))
+            info.echo("GeoPackage CRS (%s) is not the same as default CRS (%s)" % (gdf.crs['init'], CRS))
 
     elif infile_format == 'csv':
         with open(INFILE, 'r') as csvfile:
@@ -134,7 +150,7 @@ def main():
             points = unique(raw_points)
 
     else:
-        print("INFILE format not supported")
+        info.echo("INFILE format not supported")
         return
 
     prototype = GeoPackageFile(OUTFILE)
@@ -154,13 +170,13 @@ def main():
     prototype.add_point_layer("missing_points", missing)
     save_as_csv('missing_points.csv', missing)
 
-    print(len(raw_points), '-->', len(points), '-->', len(indexed_result))
-    indexed_result = apply_corrections(indexed_result, missing)
+    info.echo("%s --> %s --> %s" % (len(raw_points), len(points), len(indexed_result)))
+    indexed_result = apply_corrections(indexed_result, missing, info)
 
     prototype.add_point_layer("reordered_points", indexed_result)
     prototype.add_boundary_polygon("constructed_polygon", indexed_result)
 
-    print("Updated '%s' with 'constructed_polygon' layer (%s points)" % (
+    info.echo("Updated '%s' with 'constructed_polygon' layer (%s vertices)" % (
         os.path.split(OUTFILE)[1], len(indexed_result)
     ))
 
